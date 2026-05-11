@@ -984,7 +984,141 @@ namespace N64RecompLauncher
         {
             base.OnOpened(e);
             ApplyRoundedCorners();
+            _ = ShowFirstStartupNoticeAsync();
             _ = InitializeGamesAsync();
+        }
+
+        private async Task ShowFirstStartupNoticeAsync()
+        {
+            if (!_settings.FirstStartup)
+            {
+                return;
+            }
+
+            const string message =
+                "This launcher was developed by the community and is in no way affiliated with the development of the listed games or with the N64: Recompiled project.\n\n" +
+                "Please direct any questions or issues to the launcher's GitHub page AND NOWHERE ELSE.\n\n" +
+                "Do NOT expect support for launcher related issues elsewhere.";
+
+            await ShowFirstStartupNoticeDialogAsync(message);
+        }
+
+        private async Task ShowFirstStartupNoticeDialogAsync(string message)
+        {
+            if (!Dispatcher.UIThread.CheckAccess())
+            {
+                var completion = new TaskCompletionSource();
+                Dispatcher.UIThread.Post(async () =>
+                {
+                    try
+                    {
+                        await ShowFirstStartupNoticeDialogAsync(message);
+                        completion.SetResult();
+                    }
+                    catch (Exception ex)
+                    {
+                        completion.SetException(ex);
+                    }
+                });
+
+                await completion.Task;
+                return;
+            }
+
+            if (Avalonia.Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop ||
+                desktop.MainWindow == null)
+            {
+                return;
+            }
+
+            var okButton = new Button
+            {
+                Content = "I Understand",
+                HorizontalAlignment = HorizontalAlignment.Right,
+                MinWidth = 140,
+                Height = 42,
+                FontWeight = FontWeight.Bold,
+                Padding = new Thickness(18, 8),
+                Background = this.Resources["ThemeBorder"] as IBrush ?? new SolidColorBrush(Color.Parse("#404040")),
+                Foreground = this.Resources["ThemeText"] as IBrush ?? Brushes.White
+            };
+
+            var headerPanel = new StackPanel
+            {
+                Spacing = 8,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = "IMPORTANT",
+                        FontSize = 28,
+                        FontWeight = FontWeight.Bold,
+                        Foreground = this.Resources["ThemeText"] as IBrush ?? Brushes.White
+                    },
+                    new Border
+                    {
+                        Height = 2,
+                        Background = this.Resources["ThemeBorder"] as IBrush ?? new SolidColorBrush(Color.Parse("#404040")),
+                        Margin = new Thickness(0, 4, 0, 8)
+                    }
+                }
+            };
+
+            var messageText = new TextBlock
+            {
+                Text = message,
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 16,
+                LineHeight = 24,
+                Foreground = this.Resources["ThemeTextSecondary"] as IBrush ?? new SolidColorBrush(Color.Parse("#B8B8B8")),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 8, 0, 24)
+            };
+
+            var contentGrid = new Grid
+            {
+                RowDefinitions =
+                {
+                    new RowDefinition(GridLength.Auto),
+                    new RowDefinition(GridLength.Star),
+                    new RowDefinition(GridLength.Auto)
+                }
+            };
+
+            Grid.SetRow(headerPanel, 0);
+            Grid.SetRow(messageText, 1);
+            Grid.SetRow(okButton, 2);
+
+            contentGrid.Children.Add(headerPanel);
+            contentGrid.Children.Add(messageText);
+            contentGrid.Children.Add(okButton);
+
+            var messageBox = new Window
+            {
+                Title = "PLEASE READ",
+                Width = 640,
+                Height = 340,
+                MinWidth = 560,
+                MinHeight = 300,
+                CanResize = false,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Background = this.Resources["ThemeBase"] as IBrush ?? new SolidColorBrush(Color.Parse("#18181b")),
+                Content = new Border
+                {
+                    Padding = new Thickness(28),
+                    Background = this.Resources["ThemeBase"] as IBrush ?? new SolidColorBrush(Color.Parse("#18181b")),
+                    Child = contentGrid
+                }
+            };
+
+            okButton.Click += (s, e) =>
+            {
+                _settings.FirstStartup = false;
+                OnSettingChanged();
+                messageBox.Close();
+            };
+
+            await messageBox.ShowDialog(desktop.MainWindow);
         }
 
         private async Task InitializeGamesAsync()
