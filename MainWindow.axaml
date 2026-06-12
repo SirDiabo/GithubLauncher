@@ -1099,6 +1099,35 @@
 								<StaticResource ResourceKey="GridViewTemplate"/>
 							</ItemsControl.ItemTemplate>
 						</ItemsControl>
+						<Border x:Name="EmptyStateOverlay"
+								IsVisible="False"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Center"
+								Padding="40,32"
+								CornerRadius="8"
+								Background="{DynamicResource ThemeDarker}"
+								BorderBrush="{DynamicResource ThemeBorder}"
+								BorderThickness="1">
+							<StackPanel Spacing="12" HorizontalAlignment="Center">
+								<TextBlock Text="No apps configured"
+										   FontSize="18"
+										   FontWeight="Bold"
+										   Foreground="{DynamicResource ThemeText}"
+										   HorizontalAlignment="Center"/>
+								<TextBlock Text="Open the App Manager to browse and add apps from the catalog."
+										   FontSize="13"
+										   Foreground="{DynamicResource ThemeTextSecondary}"
+										   HorizontalAlignment="Center"
+										   TextWrapping="Wrap"
+										   MaxWidth="360"/>
+								<Button Classes="options"
+										Content="Open App Manager"
+										HorizontalAlignment="Center"
+										MinWidth="180"
+										Height="40"
+										Click="EmptyStateOpenAppManager_Click"/>
+							</StackPanel>
+						</Border>
 					</Grid>
 				</ScrollViewer>
 
@@ -1640,6 +1669,36 @@
 								<TabItem Header="Advanced">
 									<StackPanel Margin="16,12,16,16" Spacing="4">
 
+										<!-- App List Repository -->
+										<TextBlock Text="APP LIST REPOSITORY"
+												   FontSize="10" FontWeight="Bold"
+												   Foreground="{DynamicResource ThemeTextSecondary}"
+												   LetterSpacing="1"
+												   Margin="0,0,0,4"/>
+
+										<TextBlock Text="GitHub repository used to browse and add apps. Must release versioned apps.json files."
+												   FontSize="11"
+												   Foreground="{DynamicResource ThemeTextSecondary}"
+												   TextWrapping="Wrap"
+												   Margin="0,0,0,6"/>
+
+										<TextBox x:Name="AppListRepositoryTextBox"
+												 Foreground="{DynamicResource ThemeText}"
+												 Background="{DynamicResource ThemeBase}"
+												 BorderBrush="{DynamicResource ThemeBorder}"
+												 BorderThickness="1"
+												 Padding="12,10"
+												 CornerRadius="4"
+												 TextChanged="AppListRepositoryTextBox_TextChanged"/>
+
+										<Button Classes="options"
+												Content="Reset to Default"
+												HorizontalAlignment="Stretch"
+												Click="ResetAppListRepository_Click"
+												FontSize="12"/>
+
+										<Border Height="1" Background="{DynamicResource ThemeBorder}" Margin="0,8,0,8"/>
+
 										<!-- GitHub API Token -->
 										<TextBlock Text="GITHUB API TOKEN"
 												   FontSize="10" FontWeight="Bold"
@@ -1727,7 +1786,32 @@
 						IsVisible="False"
 						ZIndex="100">
 					<Grid>
-						<Grid>
+						<Grid.RowDefinitions>
+							<RowDefinition Height="Auto"/>
+							<RowDefinition Height="*"/>
+						</Grid.RowDefinitions>
+
+						<!-- App Manager Navigation Bar -->
+						<Border Grid.Row="0"
+								Background="{DynamicResource ThemeDarker}"
+								BorderBrush="{DynamicResource ThemeBorder}"
+								BorderThickness="0,0,0,1"
+								Padding="40,10">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<Button x:Name="NavManageAppsButton"
+										Classes="options"
+										Content="Manage Apps"
+										FontSize="12"
+										Click="NavManageApps_Click"/>
+								<Button x:Name="NavAppBrowserButton"
+										Classes="options"
+										Content="App Catalog"
+										FontSize="12"
+										Click="NavAppBrowser_Click"/>
+							</StackPanel>
+						</Border>
+
+						<Grid Grid.Row="1">
 							<ScrollViewer x:Name="ManageGamesTab" VerticalScrollBarVisibility="Auto" Margin="40" IsVisible="True">
 								<StackPanel Spacing="20">
 					
@@ -1931,6 +2015,51 @@
 									</Border>
 								</StackPanel>
 							</ScrollViewer>
+							<!-- App Browser Tab -->
+							<ScrollViewer x:Name="AppBrowserTab" VerticalScrollBarVisibility="Auto" Margin="40" IsVisible="False">
+								<StackPanel Spacing="20">
+
+									<Border Background="{DynamicResource ThemeDarker}"
+											BorderBrush="{DynamicResource ThemeBorder}"
+											BorderThickness="1"
+											CornerRadius="8"
+											Padding="16">
+										<StackPanel Spacing="12">
+											<Grid>
+												<Grid.ColumnDefinitions>
+													<ColumnDefinition Width="*"/>
+													<ColumnDefinition Width="Auto"/>
+												</Grid.ColumnDefinitions>
+												<StackPanel Grid.Column="0" Spacing="2">
+													<TextBlock Text="APP CATALOG"
+															   FontSize="16"
+															   FontWeight="Bold"
+															   Foreground="{DynamicResource ThemeText}"
+															   VerticalAlignment="Center"/>
+													<TextBlock x:Name="AppCatalogVersionText"
+															   Text=""
+															   FontSize="11"
+															   Foreground="{DynamicResource ThemeTextSecondary}"/>
+												</StackPanel>
+												<Button Grid.Column="1"
+														Classes="options"
+														Content="Refresh"
+														FontSize="12"
+														Click="RefreshAppCatalog_Click"/>
+											</Grid>
+											<Border Height="1" Background="{DynamicResource ThemeBorder}" Margin="0,4,0,4"/>
+											<TextBlock x:Name="AppCatalogStatusText"
+													   Text="Loading catalog..."
+													   FontSize="12"
+													   Foreground="{DynamicResource ThemeTextSecondary}"
+													   IsVisible="True"/>
+											<StackPanel x:Name="AppCatalogContent" Spacing="16" IsVisible="False"/>
+										</StackPanel>
+									</Border>
+
+								</StackPanel>
+							</ScrollViewer>
+
 						</Grid>
 					</Grid>
 				</Border>

@@ -974,6 +974,7 @@ namespace GithubLauncher
                 {
                     DataContext = this;
                     UpdateContinueButtonState();
+                    UpdateEmptyStateVisibility();
 
                     if (!_hasInitializedFocus)
                     {
@@ -1895,6 +1896,9 @@ namespace GithubLauncher
 
                 if (LinuxWindowsLaunchCommandTextBox != null)
                     LinuxWindowsLaunchCommandTextBox.Text = _settings.LinuxWindowsLaunchCommand;
+
+                if (AppListRepositoryTextBox != null)
+                    AppListRepositoryTextBox.Text = _settings.AppListRepository;
 
                 if (StartFullscreenCheckBox != null)
                     StartFullscreenCheckBox.IsChecked = _settings.StartFullscreen;
@@ -3117,6 +3121,26 @@ namespace GithubLauncher
             }
         }
 
+        private void AppListRepositoryTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (sender is TextBox textBox && _settings != null)
+            {
+                _settings.AppListRepository = textBox.Text?.Trim() ?? "SirDiabo/GHLAppList";
+                OnSettingChanged();
+            }
+        }
+
+        private void ResetAppListRepository_Click(object sender, RoutedEventArgs e)
+        {
+            if (_settings != null)
+            {
+                _settings.AppListRepository = "SirDiabo/GHLAppList";
+                if (AppListRepositoryTextBox != null)
+                    AppListRepositoryTextBox.Text = "SirDiabo/GHLAppList";
+                OnSettingChanged();
+            }
+        }
+
         private async void ClearGamePath_Click(object sender, RoutedEventArgs e)
         {
             if (_settings == null)
@@ -3927,11 +3951,13 @@ namespace GithubLauncher
         {
             var manageGamesTab = this.FindControl<ScrollViewer>("ManageGamesTab");
             var createEditTab = this.FindControl<ScrollViewer>("CreateEditTab");
+            var appBrowserTab = this.FindControl<ScrollViewer>("AppBrowserTab");
 
             if (manageGamesTab != null && createEditTab != null)
             {
                 manageGamesTab.IsVisible = true;
                 createEditTab.IsVisible = false;
+                if (appBrowserTab != null) appBrowserTab.IsVisible = false;
 
                 // Update form state
                 var formTitle = this.FindControl<TextBlock>("FormTitleText");
@@ -3948,11 +3974,13 @@ namespace GithubLauncher
         {
             var manageGamesTab = this.FindControl<ScrollViewer>("ManageGamesTab");
             var createEditTab = this.FindControl<ScrollViewer>("CreateEditTab");
+            var appBrowserTab = this.FindControl<ScrollViewer>("AppBrowserTab");
 
             if (manageGamesTab != null && createEditTab != null)
             {
                 manageGamesTab.IsVisible = false;
                 createEditTab.IsVisible = true;
+                if (appBrowserTab != null) appBrowserTab.IsVisible = false;
 
                 var cancelButton = this.FindControl<Button>("CancelButton");
                 if (cancelButton != null) cancelButton.IsVisible = true;
@@ -4186,7 +4214,369 @@ namespace GithubLauncher
             }
         }
 
-        private void CloseManageGames_Click(object sender, RoutedEventArgs e)
+        // -------------------------------------------------------------------------
+        // App Manager Navigation
+        // -------------------------------------------------------------------------
+
+        private void NavManageApps_Click(object sender, RoutedEventArgs e)
+        {
+            SwitchToManageGamesTab(sender, e);
+            HeaderTitleText.Text = "Manage Apps";
+        }
+
+        private void NavAppBrowser_Click(object sender, RoutedEventArgs e)
+        {
+            SwitchToAppBrowserTab();
+        }
+
+        private void SwitchToAppBrowserTab()
+        {
+            var manageGamesTab = this.FindControl<ScrollViewer>("ManageGamesTab");
+            var createEditTab = this.FindControl<ScrollViewer>("CreateEditTab");
+            var appBrowserTab = this.FindControl<ScrollViewer>("AppBrowserTab");
+
+            if (manageGamesTab != null) manageGamesTab.IsVisible = false;
+            if (createEditTab != null) createEditTab.IsVisible = false;
+            if (appBrowserTab != null) appBrowserTab.IsVisible = true;
+
+            HeaderTitleText.Text = "App Catalog";
+            _ = LoadAppCatalogAsync(forceRefresh: false);
+        }
+
+        private void EmptyStateOpenAppManager_Click(object sender, RoutedEventArgs e)
+        {
+            ManageGamesButton_Click(sender, e);
+            SwitchToAppBrowserTab();
+        }
+
+        private void RefreshAppCatalog_Click(object sender, RoutedEventArgs e)
+        {
+            _ = LoadAppCatalogAsync(forceRefresh: true);
+        }
+
+        // -------------------------------------------------------------------------
+        // App Catalog: fetch, version check, render
+        // -------------------------------------------------------------------------
+
+        private static readonly string AppCatalogCachePath = Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "app_catalog_cache.json");
+
+        private static readonly string AppCatalogVersionPath = Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "app_catalog_version.txt");
+
+        private async Task LoadAppCatalogAsync(bool forceRefresh)
+        {
+            var statusText = this.FindControl<TextBlock>("AppCatalogStatusText");
+            var versionText = this.FindControl<TextBlock>("AppCatalogVersionText");
+            var catalogContent = this.FindControl<StackPanel>("AppCatalogContent");
+
+            if (statusText == null || catalogContent == null)
+                return;
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                statusText.Text = "Checking for updates...";
+                statusText.IsVisible = true;
+                catalogContent.IsVisible = false;
+            });
+
+            try
+            {
+                string repo = _settings?.AppListRepository ?? "SirDiabo/GHLAppList";
+                string latestTag = await FetchLatestCatalogTagAsync(repo).ConfigureAwait(false);
+
+                string cachedVersion = string.Empty;
+                if (File.Exists(AppCatalogVersionPath))
+                    cachedVersion = (await File.ReadAllTextAsync(AppCatalogVersionPath).ConfigureAwait(false)).Trim();
+
+                bool needsDownload = forceRefresh
+                    || !File.Exists(AppCatalogCachePath)
+                    || string.IsNullOrEmpty(cachedVersion)
+                    || cachedVersion != latestTag;
+
+                if (needsDownload && !string.IsNullOrEmpty(latestTag))
+                {
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                        statusText.Text = $"Downloading catalog {latestTag}...");
+
+                    string catalogJson = await FetchCatalogJsonAsync(repo, latestTag).ConfigureAwait(false);
+                    await File.WriteAllTextAsync(AppCatalogCachePath, catalogJson).ConfigureAwait(false);
+                    await File.WriteAllTextAsync(AppCatalogVersionPath, latestTag).ConfigureAwait(false);
+                    cachedVersion = latestTag;
+
+                    if (_settings != null)
+                    {
+                        _settings.AppListCachedVersion = latestTag;
+                        OnSettingChanged();
+                    }
+                }
+
+                if (!File.Exists(AppCatalogCachePath))
+                {
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        statusText.Text = "Could not retrieve catalog. Check the repository setting and your connection.";
+                        statusText.IsVisible = true;
+                    });
+                    return;
+                }
+
+                string json = await File.ReadAllTextAsync(AppCatalogCachePath).ConfigureAwait(false);
+                var categories = ParseCatalogJson(json);
+
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (versionText != null)
+                        versionText.Text = string.IsNullOrEmpty(cachedVersion) ? string.Empty : $"Version: {cachedVersion}";
+
+                    statusText.IsVisible = false;
+                    catalogContent.IsVisible = true;
+                    RenderCatalogCategories(catalogContent, categories);
+                });
+            }
+            catch (Exception ex)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    statusText.Text = $"Failed to load catalog: {ex.Message}";
+                    statusText.IsVisible = true;
+                    catalogContent.IsVisible = false;
+                });
+            }
+        }
+
+        private async Task<string> FetchLatestCatalogTagAsync(string repo)
+        {
+            try
+            {
+                string url = $"https://api.github.com/repos/{repo}/releases/latest";
+                using var client = new System.Net.Http.HttpClient();
+                client.DefaultRequestHeaders.Add("User-Agent", "GithubLauncher");
+                if (!string.IsNullOrEmpty(_settings?.GitHubApiToken))
+                    client.DefaultRequestHeaders.Add("Authorization", $"token {_settings.GitHubApiToken}");
+
+                string response = await client.GetStringAsync(url).ConfigureAwait(false);
+                using var doc = JsonDocument.Parse(response);
+                if (doc.RootElement.TryGetProperty("tag_name", out var tag))
+                    return tag.GetString() ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"FetchLatestCatalogTag failed: {ex.Message}");
+            }
+            return string.Empty;
+        }
+
+        private async Task<string> FetchCatalogJsonAsync(string repo, string tag)
+        {
+            string url = $"https://github.com/{repo}/releases/download/{tag}/apps.json";
+            using var client = new System.Net.Http.HttpClient();
+            client.DefaultRequestHeaders.Add("User-Agent", "GithubLauncher");
+            if (!string.IsNullOrEmpty(_settings?.GitHubApiToken))
+                client.DefaultRequestHeaders.Add("Authorization", $"token {_settings.GitHubApiToken}");
+
+            return await client.GetStringAsync(url).ConfigureAwait(false);
+        }
+
+        private record CatalogEntry(string Name, string Repository, string FolderName, string GameIconUrl, string Category);
+
+        private List<(string Category, List<CatalogEntry> Entries)> ParseCatalogJson(string json)
+        {
+            var result = new List<(string, List<CatalogEntry>)>();
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                if (root.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (var section in root.EnumerateObject())
+                    {
+                        var entries = new List<CatalogEntry>();
+                        if (section.Value.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var item in section.Value.EnumerateArray())
+                            {
+                                string name = item.TryGetProperty("name", out var n) ? n.GetString() ?? string.Empty : string.Empty;
+                                string repo = item.TryGetProperty("repository", out var r) ? r.GetString() ?? string.Empty : string.Empty;
+                                string folder = item.TryGetProperty("folderName", out var f) ? f.GetString() ?? string.Empty : string.Empty;
+                                string icon = string.Empty;
+                                if (item.TryGetProperty("gameIconUrl", out var gi)) icon = gi.GetString() ?? string.Empty;
+                                else if (item.TryGetProperty("appIconUrl", out var ai)) icon = ai.GetString() ?? string.Empty;
+                                string category = item.TryGetProperty("category", out var c) ? c.GetString() ?? string.Empty : string.Empty;
+
+                                if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(repo))
+                                    entries.Add(new CatalogEntry(name, repo, folder, icon, category));
+                            }
+                        }
+                        if (entries.Count > 0)
+                            result.Add((section.Name, entries));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"ParseCatalogJson failed: {ex.Message}");
+            }
+            return result;
+        }
+
+        private void RenderCatalogCategories(StackPanel container, List<(string Category, List<CatalogEntry> Entries)> categories)
+        {
+            container.Children.Clear();
+
+            if (categories.Count == 0)
+            {
+                var empty = new TextBlock
+                {
+                    Text = "No entries found in catalog.",
+                    FontSize = 13,
+                    Foreground = this.FindResource("ThemeTextSecondary") as IBrush,
+                };
+                container.Children.Add(empty);
+                return;
+            }
+
+            var installedRepos = new HashSet<string>(
+                _gameManager?.Games.Select(g => g.Repository ?? string.Empty) ?? Enumerable.Empty<string>(),
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (var (categoryName, entries) in categories)
+            {
+                var categoryHeader = new TextBlock
+                {
+                    Text = categoryName.ToUpperInvariant(),
+                    FontSize = 11,
+                    FontWeight = FontWeight.Bold,
+                    Foreground = this.FindResource("ThemeTextSecondary") as IBrush,
+                    Margin = new Thickness(0, 8, 0, 6),
+                };
+                container.Children.Add(categoryHeader);
+
+                foreach (var entry in entries)
+                {
+                    bool alreadyAdded = installedRepos.Contains(entry.Repository);
+                    var card = BuildCatalogCard(entry, alreadyAdded);
+                    container.Children.Add(card);
+                }
+            }
+        }
+
+        private Border BuildCatalogCard(CatalogEntry entry, bool alreadyAdded)
+        {
+            var nameBlock = new TextBlock
+            {
+                Text = entry.Name,
+                FontSize = 14,
+                FontWeight = FontWeight.Bold,
+                Foreground = this.FindResource("ThemeText") as IBrush,
+            };
+
+            var repoBlock = new TextBlock
+            {
+                Text = entry.Repository,
+                FontSize = 12,
+                Foreground = this.FindResource("ThemeTextSecondary") as IBrush,
+            };
+
+            var infoStack = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
+            infoStack.Children.Add(nameBlock);
+            infoStack.Children.Add(repoBlock);
+
+            var addButton = new Button
+            {
+                Content = alreadyAdded ? "Added" : "Add",
+                FontSize = 12,
+                Width = 80,
+                IsEnabled = !alreadyAdded,
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            addButton.Classes.Add("options");
+
+            if (!alreadyAdded)
+            {
+                addButton.Tag = entry;
+                addButton.Click += CatalogAddEntry_Click;
+            }
+
+            var grid = new Grid
+            {
+                ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+            };
+            Grid.SetColumn(infoStack, 0);
+            Grid.SetColumn(addButton, 1);
+            grid.Children.Add(infoStack);
+            grid.Children.Add(addButton);
+
+            return new Border
+            {
+                Background = this.FindResource("ThemeBase") as IBrush,
+                BorderBrush = this.FindResource("ThemeBorder") as IBrush,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(12),
+                Margin = new Thickness(0, 4, 0, 0),
+                Child = grid,
+            };
+        }
+
+        private async void CatalogAddEntry_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button button || button.Tag is not CatalogEntry entry)
+                return;
+
+            try
+            {
+                var apps = await _gameManager.GetAppsAsync().ConfigureAwait(false);
+                bool duplicate = apps.Any(a =>
+                    string.Equals(a.Repository, entry.Repository, StringComparison.OrdinalIgnoreCase));
+
+                if (duplicate)
+                {
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                        _ = ShowMessageBoxAsync($"{entry.Name} is already in your app list.", "Already Added"));
+                    return;
+                }
+
+                var newApp = new GameInfo
+                {
+                    Name = entry.Name,
+                    Repository = entry.Repository,
+                    FolderName = entry.FolderName,
+                    GameIconUrl = entry.GameIconUrl,
+                    IsCustom = true,
+                    GameManager = _gameManager,
+                };
+                apps.Add(newApp);
+                await _gameManager.SaveAppsAsync(apps).ConfigureAwait(false);
+                await _gameManager.LoadGamesAsync().ConfigureAwait(false);
+
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    button.Content = "Added";
+                    button.IsEnabled = false;
+                    button.Click -= CatalogAddEntry_Click;
+                    UpdateEmptyStateVisibility();
+                });
+            }
+            catch (Exception ex)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                    _ = ShowMessageBoxAsync($"Failed to add entry: {ex.Message}", "Error"));
+            }
+        }
+
+        private void UpdateEmptyStateVisibility()
+        {
+            var overlay = this.FindControl<Border>("EmptyStateOverlay");
+            if (overlay == null)
+                return;
+
+            bool isEmpty = _gameManager?.Games == null || _gameManager.Games.Count == 0;
+            overlay.IsVisible = isEmpty;
+        }
+
+                private void CloseManageGames_Click(object sender, RoutedEventArgs e)
         {
             _isGamesManagerOpen = false;
 

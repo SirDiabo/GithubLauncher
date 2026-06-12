@@ -33,6 +33,8 @@ namespace GithubLauncher
         public float BackgroundOpacity { get; set; } = 0.15f;
         public bool EnableGamepadInput { get; set; } = true;
         public string LinuxWindowsLaunchCommand { get; set; } = string.Empty;
+        public string AppListRepository { get; set; } = "SirDiabo/GHLAppList";
+        public string AppListCachedVersion { get; set; } = string.Empty;
         private static readonly string SettingsPath = Path.Combine(
             AppDomain.CurrentDomain.BaseDirectory,
             "settings.json"

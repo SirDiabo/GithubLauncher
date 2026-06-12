@@ -344,6 +344,16 @@ namespace GithubLauncher.Services
             return Games.FirstOrDefault(g => string.Equals(g.FolderName, folderName, StringComparison.OrdinalIgnoreCase));
         }
 
+        public Task<List<GameInfo>> GetAppsAsync()
+        {
+            return LoadAppsFromJsonAsync();
+        }
+
+        public Task SaveAppsAsync(List<GameInfo> apps)
+        {
+            return SaveAppsToJsonAsync(apps);
+        }
+
         public async Task LoadGamesAsync(bool forceUpdateCheck = false)
         {
             var settings = AppSettings.Load();
