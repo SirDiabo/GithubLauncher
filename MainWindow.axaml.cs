@@ -21,6 +21,8 @@ using System.Text;
 using System.Text.Json;
 using System.Runtime.InteropServices;
 using Avalonia.Platform;
+using Avalonia.Markup.Xaml.Converters;
+
 
 #if WINDOWS
 using NAudio.Wave;
@@ -4448,85 +4450,82 @@ namespace GithubLauncher
                 };
                 container.Children.Add(categoryHeader);
 
+                var wrapPanel = new WrapPanel { Margin = new Thickness(0, 8, 0, 0), VerticalAlignment = VerticalAlignment.Top };
                 foreach (var entry in entries)
                 {
                     bool alreadyAdded = installedRepos.Contains(entry.Repository);
                     var card = BuildCatalogCard(entry, alreadyAdded);
-                    container.Children.Add(card);
+                    wrapPanel.Children.Add(card);
                 }
+                container.Children.Add(wrapPanel);
             }
         }
 
-        private Border BuildCatalogCard(CatalogEntry entry, bool alreadyAdded)
+private Border BuildCatalogCard(CatalogEntry entry, bool alreadyAdded)
         {
+            var image = new Border
+            {
+                Height = 200,
+                Background = this.FindResource("ThemeLighter") as IBrush,
+            };
+
+            if (!string.IsNullOrEmpty(entry.AppIconUrl))
+            {
+                var img = new Image
+                {
+                    Stretch = Stretch.UniformToFill,
+                };
+                image.Child = img;
+
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        using var client = new System.Net.Http.HttpClient();
+                        var imageData = await client.GetByteArrayAsync(entry.AppIconUrl);
+                        var bitmap = new Avalonia.Media.Imaging.Bitmap(new System.IO.MemoryStream(imageData));
+
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            img.Source = bitmap;
+                        });
+                    }
+                    catch
+                    {
+                    }
+                });
+            }
+
             var nameBlock = new TextBlock
             {
                 Text = entry.Name,
-                FontSize = 14,
+                FontSize = 13,
                 FontWeight = FontWeight.Bold,
                 Foreground = this.FindResource("ThemeText") as IBrush,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 8, 0, 2),
             };
 
             var repoBlock = new TextBlock
             {
                 Text = entry.Repository,
-                FontSize = 12,
+                FontSize = 11,
                 Foreground = this.FindResource("ThemeTextSecondary") as IBrush,
+                TextWrapping = TextWrapping.Wrap,
             };
 
-            var infoStack = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
+            var infoStack = new StackPanel();
             infoStack.Children.Add(nameBlock);
             infoStack.Children.Add(repoBlock);
-
-            // Catalog icon
-            Control? iconControl = null;
-            if (!string.IsNullOrEmpty(entry.AppIconUrl))
-            {
-                try
-                {
-                    var image = new Image
-                    {
-                        Width = 48,
-                        Height = 48,
-                        VerticalAlignment = VerticalAlignment.Center,
-                        Margin = new Thickness(0, 0, 12, 0)
-                    };
-
-                    // try load remote image asynchronously
-                    _ = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            using var client = new System.Net.Http.HttpClient();
-                            var imageData = await client.GetByteArrayAsync(entry.AppIconUrl);
-                            var bitmap = new Avalonia.Media.Imaging.Bitmap(new System.IO.MemoryStream(imageData));
-
-                            await Dispatcher.UIThread.InvokeAsync(() =>
-                            {
-                                image.Source = bitmap;
-                            });
-                        }
-                        catch
-                        {
-                            // can't be loaded
-                        }
-                    });
-
-                    iconControl = image;
-                }
-                catch
-                {
-                    // skip on fail
-                }
-            }
 
             var addButton = new Button
             {
                 Content = alreadyAdded ? "Added" : "Add",
-                FontSize = 12,
-                Width = 80,
+                FontSize = 11,
+                Margin = new Thickness(2, 2, 2, 2),
+                Width = 70,
+                Height = 48,
                 IsEnabled = !alreadyAdded,
-                VerticalAlignment = VerticalAlignment.Center,
             };
             addButton.Classes.Add("options");
 
@@ -4536,29 +4535,34 @@ namespace GithubLauncher
                 addButton.Click += CatalogAddEntry_Click;
             }
 
-            var contentStack = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, VerticalAlignment = VerticalAlignment.Center };
-            if (iconControl != null)
-                contentStack.Children.Add(iconControl);
-            contentStack.Children.Add(infoStack);
-
-            var grid = new Grid
+            var footerGrid = new Grid
             {
-                ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+                Margin = new Thickness(8, 4, 8, 8),
             };
-            Grid.SetColumn(contentStack, 0);
+            footerGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+            footerGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+            Grid.SetColumn(infoStack, 0);
             Grid.SetColumn(addButton, 1);
-            grid.Children.Add(contentStack);
-            grid.Children.Add(addButton);
+            footerGrid.Children.Add(infoStack);
+            footerGrid.Children.Add(addButton);
+
+            var cardGrid = new Grid();
+            cardGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            cardGrid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
+            Grid.SetRow(image, 0);
+            Grid.SetRow(footerGrid, 1);
+            cardGrid.Children.Add(image);
+            cardGrid.Children.Add(footerGrid);
 
             return new Border
             {
+                Width = 200,
+                Margin = new Thickness(6),
                 Background = this.FindResource("ThemeBase") as IBrush,
                 BorderBrush = this.FindResource("ThemeBorder") as IBrush,
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(6),
-                Padding = new Thickness(12),
-                Margin = new Thickness(0, 4, 0, 0),
-                Child = grid,
+                CornerRadius = new CornerRadius(8),
+                Child = cardGrid,
             };
         }
 
