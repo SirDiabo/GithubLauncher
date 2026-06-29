@@ -36,7 +36,7 @@ namespace GithubLauncher
         public string AppListRepository { get; set; } = "SirDiabo/GHLAppList";
         public string AppListCachedVersion { get; set; } = string.Empty;
         private static readonly string SettingsPath = Path.Combine(
-            AppDomain.CurrentDomain.BaseDirectory,
+            AppPaths.DataDirectory,
             "settings.json"
         );
 

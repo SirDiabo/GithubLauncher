@@ -164,7 +164,7 @@ namespace GithubLauncher
             try
             {
                 string currentAppDirectory = AppDomain.CurrentDomain.BaseDirectory;
-                string updateCheckFilePath = Path.Combine(currentAppDirectory, "update_check.json");
+                string updateCheckFilePath = Path.Combine(AppPaths.DataDirectory, "update_check.json");
 
                 if (File.Exists(updateCheckFilePath))
                 {
