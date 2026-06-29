@@ -209,7 +209,10 @@ public class App : Application, INotifyPropertyChanged
     private async Task CheckForUpdatesAndApplyAsync(bool isManualCheck = false)
     {
         string currentAppDirectory = AppDomain.CurrentDomain.BaseDirectory;
-        string updateCheckFilePath = Path.Combine(currentAppDirectory, UpdateCheckFileName);
+        // Update-check state is writable runtime data: keep it out of the (signed,
+        // immutable) app bundle on macOS. The executable-replacement logic below
+        // still uses currentAppDirectory.
+        string updateCheckFilePath = Path.Combine(AppPaths.DataDirectory, UpdateCheckFileName);
 
         UpdateCheckInfo updateCheckInfo = await LoadUpdateCheckInfo(updateCheckFilePath);
         string currentVersionString = updateCheckInfo.CurrentVersion;

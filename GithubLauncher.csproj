@@ -11,7 +11,7 @@
 		<Platforms>AnyCPU;x64</Platforms>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
-		<RuntimeIdentifiers>win-x64;linux-x64;linux-arm64;osx-x64</RuntimeIdentifiers>
+		<RuntimeIdentifiers>win-x64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
@@ -41,6 +41,24 @@
 		<AvaloniaResource Include="Assets/**" />
 		<AvaloniaResource Include="Assets/Icons/**" />
 	</ItemGroup>
+
+	<!-- ppy.SDL2-CS ships native SDL2 for osx-x64/linux/win but NOT osx-arm64.
+	     Bundle a self-contained official SDL2 (arm64) so the published app loads
+	     SDL2 with no external/Homebrew dependency. The .dylib is git-ignored and
+	     fetched + sha256-verified by build-app.sh (not vendored in the repo). -->
+	<ItemGroup Condition="'$(RuntimeIdentifier)' == 'osx-arm64'">
+		<None Include="native\osx-arm64\libSDL2.dylib">
+			<Link>libSDL2.dylib</Link>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+		</None>
+	</ItemGroup>
+
+	<Target Name="EnsureSdl2Native" BeforeTargets="ResolveReferences"
+	        Condition="'$(RuntimeIdentifier)' == 'osx-arm64'">
+		<Error Condition="!Exists('native\osx-arm64\libSDL2.dylib')"
+		       Text="native/osx-arm64/libSDL2.dylib is missing. Run ./build-app.sh (it downloads and sha256-verifies the official SDL2). This native is intentionally not vendored in the repo." />
+	</Target>
 
 	<ItemGroup>
 		<ProjectReference Include="lib\GitHubLauncher.Core\GitHubLauncher.Core.csproj" />
