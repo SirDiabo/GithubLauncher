@@ -1217,7 +1217,7 @@ namespace GithubLauncher.Models
                     return;
                 }
 
-                var latestRelease = result.Releases.FirstOrDefault();
+                var latestRelease = SelectLatestRelease(result.Releases);
                 if (latestRelease != null && !string.IsNullOrWhiteSpace(latestRelease.tag_name))
                 {
                     LatestVersion = latestRelease.tag_name;
@@ -1396,6 +1396,28 @@ namespace GithubLauncher.Models
             return _cachedRelease;
         }
 
+        /// <summary>
+        /// Selects the release that should be treated as "latest". Releases from
+        /// the GitHub API are newest-first but include pre-releases, so a repo
+        /// whose newest release is a pre-release (e.g. nightly/beta builds) would
+        /// otherwise be offered as the current version. Prefer the newest stable
+        /// release; fall back to the newest pre-release only when a repo publishes
+        /// no stable releases at all. Mirrors GitHub's own /releases/latest.
+        /// </summary>
+        public static GitHubRelease? SelectLatestRelease(IReadOnlyList<GitHubRelease> releases)
+        {
+            if (releases == null || releases.Count == 0)
+                return null;
+
+            for (int i = 0; i < releases.Count; i++)
+            {
+                if (!releases[i].prerelease)
+                    return releases[i];
+            }
+
+            return releases[0];
+        }
+
         public async Task<List<GitHubRelease>> FetchReleasesAsync(HttpClient httpClient)
         {
             if (string.IsNullOrWhiteSpace(Repository))
@@ -1463,7 +1485,7 @@ namespace GithubLauncher.Models
                             return;
                         }
 
-                        latestRelease = releaseResult.Releases.FirstOrDefault();
+                        latestRelease = SelectLatestRelease(releaseResult.Releases);
 
                         if (latestRelease == null)
                         {

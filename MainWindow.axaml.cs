@@ -1428,7 +1428,7 @@ namespace GithubLauncher
             {
                 game.IsLoading = true;
                 var releases = await game.FetchReleasesAsync(_gameManager.HttpClient);
-                var latestRelease = releases.FirstOrDefault();
+                var latestRelease = GameInfo.SelectLatestRelease(releases);
                 if (latestRelease == null)
                 {
                     await ShowMessageBoxAsync($"No downloadable releases were found for {game.Name}.", "No Releases");

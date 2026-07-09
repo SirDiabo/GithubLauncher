@@ -5,6 +5,7 @@ using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Threading;
+using GitHubLauncher.Core.Services;
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -743,9 +744,9 @@ public class App : Application, INotifyPropertyChanged
 
     private async Task DownloadAndApplyUpdate(GitHubRelease latestRelease, string currentAppDirectory, UpdateCheckInfo updateCheckInfo)
     {
-        string platformIdentifier = GetPlatformIdentifier();
+        string platformIdentifier = PlatformAssetMatcher.GetPlatformIdentifier(GitHubLauncher.Core.Models.TargetOS.Auto);
         var asset = latestRelease.assets.FirstOrDefault(a =>
-            a.name.Contains(platformIdentifier, StringComparison.OrdinalIgnoreCase) &&
+            PlatformAssetMatcher.MatchesPlatform(a.name, platformIdentifier) &&
             (a.name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) || a.name.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase))
         );
 
@@ -1290,31 +1291,5 @@ rm -- ""$0""
             await Task.Delay(1000).ConfigureAwait(false);
             Environment.Exit(0);
         });
-    }
-
-    private string GetPlatformIdentifier()
-    {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            return "Windows";
-        }
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
-            return "macOS";
-        }
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
-            var arch = RuntimeInformation.OSArchitecture;
-            return arch switch
-            {
-                Architecture.Arm64 => "Linux-ARM64",
-                Architecture.X64 => "Linux-X64",
-                Architecture.X86 => "Linux-X86",
-                Architecture.Arm => "Linux-ARM",
-                _ => "Linux-X64"
-            };
-        }
-
-        throw new PlatformNotSupportedException("Unsupported operating system");
     }
 }

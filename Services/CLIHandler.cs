@@ -858,9 +858,9 @@ namespace GithubLauncher
                     return 0;
                 }
 
-                string platformIdentifier = GetPlatformIdentifier();
+                string platformIdentifier = PlatformAssetMatcher.GetPlatformIdentifier(TargetOS.Auto);
                 var asset = release.assets.FirstOrDefault(a =>
-                    a.name.Contains(platformIdentifier, StringComparison.OrdinalIgnoreCase) &&
+                    PlatformAssetMatcher.MatchesPlatform(a.name, platformIdentifier) &&
                     (a.name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) || a.name.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase)));
 
                 if (asset == null)
@@ -1119,28 +1119,6 @@ rm -- ""$0""
                 });
             }
         }
-
-        private static string GetPlatformIdentifier()
-        {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                return "Windows";
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                return "macOS";
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                return RuntimeInformation.OSArchitecture switch
-                {
-                    Architecture.Arm64 => "Linux-ARM64",
-                    Architecture.X64 => "Linux-X64",
-                    Architecture.X86 => "Linux-X86",
-                    Architecture.Arm => "Linux-ARM",
-                    _ => "Linux-X64"
-                };
-            }
-
-            throw new PlatformNotSupportedException("Unsupported operating system");
-        }
-
         private static bool IsNewerVersion(string latestVersion, string currentVersion)
         {
             try
