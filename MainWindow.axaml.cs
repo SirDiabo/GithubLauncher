@@ -1892,7 +1892,10 @@ namespace GithubLauncher
                 }
 
                 if (GitHubTokenTextBox != null)
+                {
                     GitHubTokenTextBox.Text = _settings.GitHubApiToken;
+                    GitHubTokenTextBox.PasswordChar = '*';
+                }
 
                 if (GamePathTextBox != null)
                     GamePathTextBox.Text = _settings.AppsPath;
