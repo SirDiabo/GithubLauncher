@@ -163,16 +163,51 @@ namespace GithubLauncher.Services
             {
                 if (File.Exists(_legacyGamesConfigPath))
                 {
-                    var migratedApps = await LoadAppsFromFileAsync(_legacyGamesConfigPath).ConfigureAwait(false);
+                    var migratedApps = MergeBuiltInApps(await LoadAppsFromFileAsync(_legacyGamesConfigPath).ConfigureAwait(false));
                     await SaveAppsToJsonAsync(migratedApps).ConfigureAwait(false);
                     return migratedApps;
                 }
 
-                await SaveAppsToJsonAsync([]).ConfigureAwait(false);
-                return [];
+                var seededApps = MergeBuiltInApps([]);
+                await SaveAppsToJsonAsync(seededApps).ConfigureAwait(false);
+                return seededApps;
             }
 
-            return await LoadAppsFromFileAsync(_appsConfigPath).ConfigureAwait(false);
+            return MergeBuiltInApps(await LoadAppsFromFileAsync(_appsConfigPath).ConfigureAwait(false));
+        }
+
+        private static List<GameInfo> GetBuiltInApps()
+        {
+            return
+            [
+                new GameInfo
+                {
+                    Name = "Gen1Recomp",
+                    Repository = "bryanthaboi/pokemon-gen1-recomp-project",
+                    FolderName = "Gen1Recomp",
+                    GameIconUrl = "https://raw.githubusercontent.com/bryanthaboi/pokemon-gen1-recomp-project/main/assets/logo/gen1recomp_cover.png",
+                    IsExperimental = false,
+                    IsCustom = false,
+                },
+            ];
+        }
+
+        private List<GameInfo> MergeBuiltInApps(List<GameInfo> apps)
+        {
+            var existingRepos = new HashSet<string>(
+                apps.Where(a => !string.IsNullOrWhiteSpace(a.Repository)).Select(a => a.Repository!),
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (var builtIn in GetBuiltInApps())
+            {
+                if (!string.IsNullOrWhiteSpace(builtIn.Repository) && existingRepos.Contains(builtIn.Repository!))
+                    continue;
+
+                builtIn.GameManager = this;
+                apps.Add(builtIn);
+            }
+
+            return apps;
         }
 
         private async Task<List<GameInfo>> LoadAppsFromFileAsync(string path)
