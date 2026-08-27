@@ -1,4 +1,5 @@
 { lib
+, stdenv
 , stdenvNoCC
 , makeWrapper
 
@@ -122,31 +123,34 @@ EOF
       ]} \
       --set DOTNET_ROOT ${dotnet-runtime_9} \
       --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [
-        icu
-        gtk3
-        glib
-        fontconfig
-        freetype
-        libGL
-        libxkbcommon
-        wayland
-        openssl
-        zlib
+  icu
+  gtk3
+  glib
+  fontconfig
+  freetype
+  libGL
+  libxkbcommon
+  wayland
+  openssl
+  zlib
 
-        xorg.libX11
-        xorg.libICE
-        xorg.libSM
-        xorg.libXi
-        xorg.libXcursor
-        xorg.libXrandr
-        xorg.libXrender
-        xorg.libxcb
-        xorg.libXext
-        xorg.libXfixes
-        xorg.libXdamage
-        xorg.libXcomposite
-      ]}
+  curl
+  SDL2
+  stdenv.cc.cc.lib
 
+  xorg.libX11
+  xorg.libICE
+  xorg.libSM
+  xorg.libXi
+  xorg.libXcursor
+  xorg.libXrandr
+  xorg.libXrender
+  xorg.libxcb
+  xorg.libXext
+  xorg.libXfixes
+  xorg.libXdamage
+  xorg.libXcomposite
+]}
     runHook postInstall
   '';
 
