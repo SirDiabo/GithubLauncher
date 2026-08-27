@@ -19,6 +19,7 @@
 , wayland
 , openssl
 , zlib
+, SDL2
 , xorg
 }:
 
