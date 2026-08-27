@@ -35,6 +35,31 @@ A modern, user-friendly launcher application for managing and running GitHub-hos
 2. Extract the downloaded archive to your preferred location
 3. Run the executable.
 
+#### Nix / NixOS
+
+GithubLauncher can be run directly with:
+
+```sh
+nix run github:SirDiabo/GithubLauncher
+```
+
+Or add GithubLauncher as a flake input:
+
+```nix
+inputs.github-launcher = {
+  url = "github:SirDiabo/GithubLauncher";
+  inputs.nixpkgs.follows = "nixpkgs";
+};
+```
+
+Then install it from the flake output:
+
+```nix
+home.packages = [
+  inputs.github-launcher.packages.${pkgs.system}.githublauncher
+];
+```
+
 ## Usage
 
 1. Launch the application
