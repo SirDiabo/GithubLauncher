@@ -39,6 +39,10 @@ stdenvNoCC.mkDerivation {
 
     mkdir -p $out/bin
     mkdir -p $out/share/applications
+    mkdir -p $out/share/icons/hicolor/512x512/apps
+
+    install -Dm644 ${../Assets/app.png} \
+      $out/share/icons/hicolor/512x512/apps/githublauncher.png
 
     cat > $out/bin/githublauncher <<'EOF'
 #!/usr/bin/env bash
@@ -107,7 +111,7 @@ Type=Application
 Name=GithubLauncher
 Comment=Launcher for GitHub release apps and games
 Exec=$out/bin/githublauncher
-Icon=github
+Icon=githublauncher
 Terminal=false
 Categories=Game;Utility;
 StartupNotify=true
