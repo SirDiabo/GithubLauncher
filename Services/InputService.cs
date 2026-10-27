@@ -19,6 +19,7 @@ namespace GithubLauncher.Services
         private readonly Dictionary<int, IntPtr> _gameControllers = new();
         private bool _disposed = false;
         private bool _isWindowActive = true;
+        private bool _sdlInitialized = false;
 
         // Gamepad deadzone threshold
         private const float DeadZone = 0.3f;
@@ -42,36 +43,57 @@ namespace GithubLauncher.Services
         public InputService(Window mainWindow, AppSettings appSettings)
         {
             _mainWindow = mainWindow;
-            InitializeSDL();
 
-            if (appSettings.EnableGamepadInput)
+            if (appSettings.EnableGamepadInput && InitializeSDL())
             {
                 InitializeGamepadPolling();
             }
         }
 
-        private void InitializeSDL()
+        private bool InitializeSDL()
         {
-            if (SDL.SDL_Init(SDL.SDL_INIT_GAMECONTROLLER | SDL.SDL_INIT_VIDEO) < 0)
+            if (_sdlInitialized)
             {
-                System.Diagnostics.Debug.WriteLine($"SDL initialization failed: {SDL.SDL_GetError()}");
-                return;
+                return true;
             }
 
-            // Open all available game controllers
-            int numJoysticks = SDL.SDL_NumJoysticks();
-            for (int i = 0; i < numJoysticks; i++)
+            try
             {
-                if (SDL.SDL_IsGameController(i) == SDL.SDL_bool.SDL_TRUE)
+                if (SDL.SDL_Init(SDL.SDL_INIT_GAMECONTROLLER | SDL.SDL_INIT_VIDEO) < 0)
                 {
-                    IntPtr controller = SDL.SDL_GameControllerOpen(i);
-                    if (controller != IntPtr.Zero)
+                    System.Diagnostics.Debug.WriteLine($"SDL initialization failed: {SDL.SDL_GetError()}");
+                    return false;
+                }
+
+                _sdlInitialized = true;
+
+                // Open all available game controllers
+                int numJoysticks = SDL.SDL_NumJoysticks();
+                for (int i = 0; i < numJoysticks; i++)
+                {
+                    if (SDL.SDL_IsGameController(i) == SDL.SDL_bool.SDL_TRUE)
                     {
-                        _gameControllers[i] = controller;
-                        _gamepadStates[i] = new GamepadState();
-                        System.Diagnostics.Debug.WriteLine($"Game controller {i} connected: {SDL.SDL_GameControllerName(controller)}");
+                        IntPtr controller = SDL.SDL_GameControllerOpen(i);
+                        if (controller != IntPtr.Zero)
+                        {
+                            _gameControllers[i] = controller;
+                            _gamepadStates[i] = new GamepadState();
+                            System.Diagnostics.Debug.WriteLine($"Game controller {i} connected: {SDL.SDL_GameControllerName(controller)}");
+                        }
                     }
                 }
+
+                return true;
+            }
+            catch (DllNotFoundException ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"SDL library not found, disabling gamepad input: {ex.Message}");
+                return false;
+            }
+            catch (EntryPointNotFoundException ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"SDL entry point not found, disabling gamepad input: {ex.Message}");
+                return false;
             }
         }
 
@@ -79,6 +101,11 @@ namespace GithubLauncher.Services
         {
             if (enabled && _gamepadTimer == null)
             {
+                if (!InitializeSDL())
+                {
+                    return;
+                }
+
                 InitializeGamepadPolling();
             }
             else if (!enabled && _gamepadTimer != null)
@@ -100,6 +127,11 @@ namespace GithubLauncher.Services
 
         private void GamepadTimer_Tick(object? sender, EventArgs e)
         {
+            if (!_sdlInitialized)
+            {
+                return;
+            }
+
             CheckSDLWindowFocus();
 
             if (!_isWindowActive)
@@ -484,13 +516,18 @@ namespace GithubLauncher.Services
                 _gamepadTimer?.Stop();
                 _gamepadTimer = null;
 
-                foreach (var controller in _gameControllers.Values)
+                if (_sdlInitialized)
                 {
-                    SDL.SDL_GameControllerClose(controller);
-                }
-                _gameControllers.Clear();
+                    foreach (var controller in _gameControllers.Values)
+                    {
+                        SDL.SDL_GameControllerClose(controller);
+                    }
+                    _gameControllers.Clear();
 
-                SDL.SDL_Quit();
+                    SDL.SDL_Quit();
+                    _sdlInitialized = false;
+                }
+
                 _disposed = true;
             }
         }

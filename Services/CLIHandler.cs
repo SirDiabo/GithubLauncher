@@ -164,7 +164,7 @@ namespace GithubLauncher
             try
             {
                 string currentAppDirectory = AppDomain.CurrentDomain.BaseDirectory;
-                string updateCheckFilePath = Path.Combine(currentAppDirectory, "update_check.json");
+                string updateCheckFilePath = Path.Combine(LauncherPaths.DataDirectory, "update_check.json");
 
                 if (File.Exists(updateCheckFilePath))
                 {
@@ -886,7 +886,10 @@ namespace GithubLauncher
 
                 if (asset.name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
                 {
-                    ZipFile.ExtractToDirectory(tempDownloadPath, tempUpdateFolder, true);
+                    if (OperatingSystem.IsMacOS())
+                        await MacOSUpdater.ExtractArchiveAsync(tempDownloadPath, tempUpdateFolder);
+                    else
+                        ZipFile.ExtractToDirectory(tempDownloadPath, tempUpdateFolder, true);
                 }
                 else
                 {
@@ -912,7 +915,7 @@ namespace GithubLauncher
 
         private static string LoadCurrentLauncherVersion(string currentAppDirectory)
         {
-            string updateCheckFilePath = Path.Combine(currentAppDirectory, UpdateCheckFileName);
+            string updateCheckFilePath = Path.Combine(LauncherPaths.DataDirectory, UpdateCheckFileName);
             if (File.Exists(updateCheckFilePath))
             {
                 try
@@ -972,12 +975,18 @@ namespace GithubLauncher
 
         private static async Task CreateAndRunLauncherUpdaterScript(GitHubRelease release, string tempUpdateFolder, string tempDownloadPath, string currentAppDirectory)
         {
+            if (OperatingSystem.IsMacOS() && LauncherPaths.AppBundle != null)
+            {
+                await MacOSUpdater.StartAsync(tempUpdateFolder, release.tag_name);
+                return;
+            }
+
             int currentProcessId = Environment.ProcessId;
             string applicationExecutable = Environment.ProcessPath
                 ?? Process.GetCurrentProcess().MainModule?.FileName
                 ?? throw new InvalidOperationException("Could not determine launcher executable path.");
             string backupDir = Path.Combine(Path.GetTempPath(), "GithubLauncher_backup_" + DateTime.Now.ToString("yyyyMMdd_HHmmss"));
-            string updateCheckFilePath = Path.Combine(currentAppDirectory, UpdateCheckFileName);
+            string updateCheckFilePath = Path.Combine(LauncherPaths.DataDirectory, UpdateCheckFileName);
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
@@ -1125,7 +1134,7 @@ rm -- ""$0""
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 return "Windows";
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                return "macOS";
+                return RuntimeInformation.ProcessArchitecture == Architecture.Arm64 ? "macOS-ARM64" : "macOS-x64";
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
                 return RuntimeInformation.OSArchitecture switch

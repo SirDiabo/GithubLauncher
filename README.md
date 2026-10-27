@@ -35,6 +35,22 @@ A modern, user-friendly launcher application for managing and running GitHub-hos
 2. Extract the downloaded archive to your preferred location
 3. Run the executable.
 
+### macOS (Apple Silicon and Intel)
+
+Choose `GithubLauncher-macOS-ARM64.zip` for Apple Silicon (M-series), or `GithubLauncher-macOS-x64.zip` for Intel. Extract the archive and open `GithubLauncher.app`. These packages include the .NET runtime and SDL2; no Homebrew packages or separate runtime installation are needed.
+
+Development builds are ad-hoc signed, not Developer ID signed or notarized. macOS may require approval in System Settings > Privacy & Security. Only approve builds from a source you trust.
+
+To build locally, install the .NET 9 SDK, Xcode Command Line Tools, and CMake, initialize the submodule with `git submodule update --init --recursive`, then run:
+
+```bash
+bash scripts/package-macos.sh osx-arm64
+```
+
+Use `osx-x64` for Intel. The script builds a pinned, checksum-verified SDL2, publishes a self-contained app, checks its architecture and ad-hoc signature, and creates the app and ZIP under `publish/`. GitHub Actions uses the same script for both architectures and uploads separate ZIP artifacts.
+
+Launcher updates select the package matching the running process architecture, avoiding accidental replacement of an ARM64 installation with an Intel build.
+
 ## Usage
 
 1. Launch the application

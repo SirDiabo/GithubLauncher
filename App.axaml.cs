@@ -5,6 +5,7 @@ using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Threading;
+using GithubLauncher.Services;
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -209,7 +210,7 @@ public class App : Application, INotifyPropertyChanged
     private async Task CheckForUpdatesAndApplyAsync(bool isManualCheck = false)
     {
         string currentAppDirectory = AppDomain.CurrentDomain.BaseDirectory;
-        string updateCheckFilePath = Path.Combine(currentAppDirectory, UpdateCheckFileName);
+        string updateCheckFilePath = Path.Combine(LauncherPaths.DataDirectory, UpdateCheckFileName);
 
         UpdateCheckInfo updateCheckInfo = await LoadUpdateCheckInfo(updateCheckFilePath);
         string currentVersionString = updateCheckInfo.CurrentVersion;
@@ -835,7 +836,10 @@ public class App : Application, INotifyPropertyChanged
                 {
                     if (asset.name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
                     {
-                        ZipFile.ExtractToDirectory(tempDownloadPath, tempUpdateFolder, true);
+                        if (OperatingSystem.IsMacOS())
+                            await MacOSUpdater.ExtractArchiveAsync(tempDownloadPath, tempUpdateFolder);
+                        else
+                            ZipFile.ExtractToDirectory(tempDownloadPath, tempUpdateFolder, true);
 
                         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                         {
@@ -1026,6 +1030,13 @@ public class App : Application, INotifyPropertyChanged
 
     private async Task CreateAndRunUpdaterScript(GitHubRelease latestRelease, string tempUpdateFolder, string tempDownloadPath, string currentAppDirectory, UpdateCheckInfo updateCheckInfo)
     {
+        if (OperatingSystem.IsMacOS() && LauncherPaths.AppBundle != null)
+        {
+            await MacOSUpdater.StartAsync(tempUpdateFolder, latestRelease.tag_name);
+            ShutdownForUpdate();
+            return;
+        }
+
         int currentProcessId = Environment.ProcessId;
         string applicationExecutable = Process.GetCurrentProcess().MainModule?.FileName
             ?? throw new InvalidOperationException("Could not determine the current application executable path.");
@@ -1044,7 +1055,7 @@ public class App : Application, INotifyPropertyChanged
     private async Task CreateWindowsUpdaterScript(GitHubRelease latestRelease, string tempUpdateFolder, string tempDownloadPath, string currentAppDirectory, UpdateCheckInfo updateCheckInfo, string applicationExecutable, string backupDir, int currentProcessId)
     {
         string updaterScriptPath = Path.Combine(Path.GetTempPath(), "GithubLauncher_Updater.cmd");
-        string updateCheckFilePath = Path.Combine(currentAppDirectory, UpdateCheckFileName);
+        string updateCheckFilePath = Path.Combine(LauncherPaths.DataDirectory, UpdateCheckFileName);
 
         string scriptContent = $@"@echo off
 echo GithubLauncher Updater - Version {latestRelease.tag_name}
@@ -1130,7 +1141,7 @@ del ""%~f0""
     private async Task CreateUnixUpdaterScript(GitHubRelease latestRelease, string tempUpdateFolder, string tempDownloadPath, string currentAppDirectory, UpdateCheckInfo updateCheckInfo, string applicationExecutable, string backupDir, int currentProcessId)
     {
         string updaterScriptPath = Path.Combine(Path.GetTempPath(), "GithubLauncher_Updater.sh");
-        string updateCheckFilePath = Path.Combine(currentAppDirectory, UpdateCheckFileName);
+        string updateCheckFilePath = Path.Combine(LauncherPaths.DataDirectory, UpdateCheckFileName);
 
         bool isMacAppBundle = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) &&
                              Directory.GetDirectories(tempUpdateFolder, "*.app", SearchOption.TopDirectoryOnly).Any();
@@ -1300,7 +1311,7 @@ rm -- ""$0""
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
-            return "macOS";
+            return RuntimeInformation.ProcessArchitecture == Architecture.Arm64 ? "macOS-ARM64" : "macOS-x64";
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
